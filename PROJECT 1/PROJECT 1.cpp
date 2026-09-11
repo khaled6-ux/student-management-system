@@ -1,11 +1,17 @@
-// PROJECT 1.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+
 
 #include <iostream>
+#include "student.h"
 using namespace std;
 
 int main()
 {
-    cout << "PROJECT1\n";
+	student s1("John Doe", 12345, 20, "Computer Science", 3.8);
+
+	cout << "Student Name: " << s1.getNAME() << endl;
+	cout << "Student ID: " << s1.getID() << endl;
+	cout << "Student Age: " << s1.getAGE() << endl;
+	cout << "Student Major: " << s1.getMAJOR() << endl;
+	cout << "Student Grade: " << s1.getGRADE() << endl;
 }
 
