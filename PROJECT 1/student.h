@@ -15,9 +15,16 @@ public:
     student();
     student(string NAME, int ID, int AGE, string MAJOR, double GRADE);
 
-    int getID();
-    string getNAME();
-    int getAGE();
-    string getMAJOR();
-    double getGRADE();
+    int getID() const;
+    string getNAME() const;
+    int getAGE() const;
+    string getMAJOR() const;
+    double getGRADE() const;
+
+	void setID(int ID);
+	void setNAME(string NAME);
+	void setAGE(int AGE);
+	void setMAJOR(string MAJOR);
+	void setGRADE(double GRADE);
+
 };

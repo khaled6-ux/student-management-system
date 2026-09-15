@@ -141,12 +141,14 @@
   <ItemGroup>
     <ClCompile Include="PROJECT 1.cpp" />
     <ClCompile Include="student.cpp" />
+    <ClCompile Include="studentmanager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="student.h" />
+    <ClInclude Include="studentmanager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
