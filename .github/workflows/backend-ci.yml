@@ -1,4 +1,4 @@
-name: Local C++ and SQLite CI
+name: Backend CI
 
 on:
   push:
@@ -22,8 +22,8 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     env:
-      STUDENT_DB_PATH: ${{ runner.temp }}/student-management-ci.db
-      PORT: 8080
+      STUDENT_DB_PATH: /tmp/student-management-ci.db
+      PORT: "8080"
       CORS_ORIGIN: http://127.0.0.1:5173
     steps:
       - name: Check out repository
@@ -37,10 +37,7 @@ jobs:
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
       - name: Configure CMake
         run: |
-          cmake -S . -B build \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DVCPKG_TARGET_TRIPLET=x64-linux
+          cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=Release -DVCPKG_TARGET_TRIPLET=x64-linux
       - name: Build C++ API and tests
         run: cmake --build build --parallel 2
       - name: Run C++ unit and SQLite repository tests
