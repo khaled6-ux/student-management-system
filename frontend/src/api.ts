@@ -1,6 +1,6 @@
 import type { Student, StudentInput } from "./types";
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -14,7 +14,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
-    throw new Error("Cannot connect to the C++ API. Check that the backend is running.");
+    throw new Error("Cannot connect to the local C++ API. Start the application using run-local.ps1.");
   }
 
   const payload: unknown = await response.json().catch(() => null);
@@ -34,29 +34,21 @@ export async function listStudents(): Promise<Student[]> {
 }
 
 export function createStudent(input: StudentInput): Promise<Student> {
-  return request<Student>("/api/students", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return request<Student>("/api/students", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateStudent(id: number, input: StudentInput): Promise<Student> {
-  return request<Student>(`/api/students/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(input),
-  });
+  return request<Student>(`/api/students/${id}`, { method: "PUT", body: JSON.stringify(input) });
 }
 
 export function removeStudent(id: number): Promise<{ message: string }> {
-  return request<{ message: string }>(`/api/students/${id}`, {
-    method: "DELETE",
-  });
+  return request<{ message: string }>(`/api/students/${id}`, { method: "DELETE" });
 }
 
 export async function checkApi(): Promise<boolean> {
   try {
-    const result = await request<{ status: string }>("/api/health");
-    return result.status === "ok";
+    const result = await request<{ status: string; database: string }>("/api/health");
+    return result.status === "ok" && result.database === "sqlite";
   } catch {
     return false;
   }

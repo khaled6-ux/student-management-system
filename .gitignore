@@ -15,6 +15,12 @@ x86/
 # Node
 node_modules/
 frontend/dist/
+# Local app data and logs
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
 # Secrets
 .env
 .env.*

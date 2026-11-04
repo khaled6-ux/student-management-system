@@ -1,22 +1,25 @@
-# Backend and database integration
+# Local backend and SQLite
 
-The C++ API is tested at two levels:
+The C++ API owns SQLite initialization. On startup it opens the file configured by `STUDENT_DB_PATH`, or defaults to `data/students.db`, creates the parent directory, enables foreign keys, sets a five-second busy timeout, and creates the student table and indexes if they do not exist.
 
-1. `student-core-tests` validates service-layer input normalization and GPA/age/name rules without a database.
-2. `backend/tests/api_integration.py` performs HTTP-level health, list, create, read, update, validation, delete, and not-found checks against a running API backed by PostgreSQL.
+No PostgreSQL service or database installation is needed.
 
-Run the full test sequence locally after starting PostgreSQL and building the API:
+## Tests
 
-```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/init.sql
-ctest --test-dir build --output-on-failure
-./build/student-api
+- `student-core-tests`: service validation and normalization.
+- `student-repository-tests`: SQLite repository create/read/update/delete and persistence behavior using a temporary database file.
+- `backend/tests/api_integration.py`: HTTP health, list, create, read, update, validation, delete, and not-found behavior against a running local API.
+
+Run C++ tests with:
+
+```powershell
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-In a second terminal:
+Run the HTTP test after starting `student-api` with `STUDENT_DB_PATH` set to a temporary local file:
 
-```bash
-python3 backend/tests/api_integration.py
+```powershell
+$env:STUDENT_DB_PATH = "$env:TEMP\student-management-test.db"
+python backend/tests/api_integration.py
 ```
-
-GitHub Actions runs the same checks against a disposable PostgreSQL 16 service for relevant pushes and pull requests.
