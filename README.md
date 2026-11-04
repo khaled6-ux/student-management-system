@@ -1,27 +1,91 @@
-# Student Management System — Rebuild
+# Student Management System
 
-This branch begins the full-stack modernization while preserving the original Visual Studio C++ console project in `PROJECT 1/`.
+A full-stack modernization of the original C++ student management coursework project. The original Visual Studio console application is preserved in `PROJECT 1/`.
 
-## Target stack
-- C++20 + Crow HTTP API
-- libpqxx + PostgreSQL
-- React + TypeScript + Vite frontend (next implementation step)
+## Stack
 
-## Backend endpoints
-- GET /api/health
-- GET /api/students
-- POST /api/students
-- GET /api/students/{id}
-- PUT /api/students/{id}
-- DELETE /api/students/{id}
+- **Frontend:** React, TypeScript, Vite
+- **Backend:** C++20, Crow HTTP framework
+- **Database:** PostgreSQL, accessed with libpqxx
+- **Build:** CMake and vcpkg
 
-## Local database
-Install Docker Desktop and run `docker compose up -d database`. The schema is in `database/init.sql`.
+## Current application features
 
-## C++ dependencies
-Install CMake and vcpkg, then install Crow and libpqxx using the manifest. Configure CMake with the vcpkg toolchain. Set DATABASE_URL, CORS_ORIGIN and PORT before starting the API.
+- Student directory with search by name, ID, or major
+- Filter by major and sort by newest, name, GPA, or age
+- Dashboard statistics: total students, average GPA, highest GPA, and number of majors
+- Create, edit, and delete student records
+- Responsive layout for desktop, tablet, and mobile
+- API connection indicator and error/empty/loading states
 
-## Important
-This is an early development branch, not a production-ready application. The frontend, authentication, authorization, automated integration tests, migration tooling, and deployment hardening are not complete. Do not expose it publicly or store real student records yet. Confirm the institution's GPA scale before importing legacy records.
+## Run locally
 
-See [Phase 1 audit](docs/phase-1-audit.md) and [architecture](docs/architecture.md).
+### 1. Start PostgreSQL
+
+Install Docker Desktop, then from the repository root run:
+
+```bash
+docker compose up -d database
+```
+
+The schema is initialized from `database/init.sql`.
+
+### 2. Build and run the C++ API
+
+Install CMake, a C++20 compiler, and vcpkg. The vcpkg manifest installs Crow and libpqxx.
+
+Configure the project with the vcpkg toolchain file, then build:
+
+```bash
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
+cmake --build build --config Release
+```
+
+Set the database connection string and API port before running the executable:
+
+```text
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/student_manager
+PORT=8080
+CORS_ORIGIN=http://localhost:5173
+```
+
+On Windows PowerShell, set these with `$env:DATABASE_URL = "..."`, `$env:PORT = "8080"`, and `$env:CORS_ORIGIN = "http://localhost:5173"`.
+
+### 3. Run the React frontend
+
+```bash
+cd frontend
+npm install
+```
+
+Copy `.env.example` to `.env`, then start Vite:
+
+```bash
+npm run dev
+```
+
+Open http://localhost:5173.
+
+## API
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/health` | API and database readiness |
+| GET | `/api/students` | List students |
+| POST | `/api/students` | Create a student |
+| GET | `/api/students/{id}` | Get one student |
+| PUT | `/api/students/{id}` | Update a student |
+| DELETE | `/api/students/{id}` | Delete a student |
+
+## Tests and CI
+
+- C++ validation tests run through CTest.
+- GitHub Actions checks the frontend TypeScript build on relevant pushes and pull requests.
+
+## Important deployment and data notes
+
+This is a development-stage application, not a production-ready student information system. Authentication, role-based authorization, audit logging, production secret management, TLS, rate limiting, and operational backup/restore still need implementation before public deployment or use with real student records.
+
+The original console application accepts a grade from 0 to 100, while its sample records contain values such as 3.1 and 3.0. The rebuilt database currently treats this field as a 0.00–4.00 GPA. Confirm the intended grading scale and validate any legacy data before migration.
+
+See [the repository audit](docs/phase-1-audit.md), [architecture notes](docs/architecture.md), and [frontend setup](frontend/README.md).

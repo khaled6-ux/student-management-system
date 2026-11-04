@@ -1,16 +1,170 @@
 #include "student_repository.hpp"
 #include "student_service.hpp"
+
 #include <crow.h>
+
+#include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <stdexcept>
-namespace { void cors(crow::response&r){const char*o=std::getenv("CORS_ORIGIN");r.set_header("Access-Control-Allow-Origin",o?o:"http://localhost:5173");r.set_header("Access-Control-Allow-Methods","GET,POST,PUT,DELETE,OPTIONS");r.set_header("Access-Control-Allow-Headers","Content-Type");} crow::response json(int code,crow::json::wvalue v){crow::response r(code,v.dump());r.set_header("Content-Type","application/json");cors(r);return r;} crow::response err(int code,std::string m){crow::json::wvalue v;v["error"]=m;return json(code,std::move(v));} crow::json::wvalue encode(const Student&s){crow::json::wvalue v;v["id"]=s.id;v["name"]=s.name;v["age"]=s.age;v["major"]=s.major;v["gpa"]=s.gpa;return v;} Student decode(const crow::json::rvalue&v){if(!v||!v.has("name")||!v.has("age")||!v.has("major")||!v.has("gpa"))throw std::invalid_argument("Required fields: name, age, major, gpa.");return normalize_student({0,v["name"].s(),v["age"].i(),v["major"].s(),v["gpa"].d()});}}
-int main(){crow::SimpleApp app;StudentRepository repo;
-CROW_ROUTE(app,"/api/health")([]{crow::json::wvalue v;v["status"]="ok";return json(200,std::move(v));});
-CROW_ROUTE(app,"/api/students").methods(crow::HTTPMethod::GET)([&]{try{crow::json::wvalue v;crow::json::wvalue::list a;for(auto&s:repo.list())a.push_back(encode(s));v["data"]=std::move(a);return json(200,std::move(v));}catch(std::exception const&e){std::cerr<<e.what()<<'\\n';return err(500,"Database operation failed.");}});
-CROW_ROUTE(app,"/api/students").methods(crow::HTTPMethod::POST)([&](crow::request const&r){try{auto body=crow::json::load(r.body);if(!body)return err(400,"Invalid JSON.");auto s=decode(body);if(auto problem=validate_student(s))return err(422,*problem);return json(201,encode(repo.create(s)));}catch(std::invalid_argument const&e){return err(400,e.what());}catch(std::exception const&e){std::cerr<<e.what()<<'\\n';return err(500,"Database operation failed.");}});
-CROW_ROUTE(app,"/api/students/<int>").methods(crow::HTTPMethod::GET)([&](int id){try{auto s=repo.get(id);if(!s)return err(404,"Student not found.");return json(200,encode(*s));}catch(...){return err(500,"Database operation failed.");}});
-CROW_ROUTE(app,"/api/students/<int>").methods(crow::HTTPMethod::PUT)([&](crow::request const&r,int id){try{auto b=crow::json::load(r.body);if(!b)return err(400,"Invalid JSON.");auto s=decode(b);if(auto p=validate_student(s))return err(422,*p);if(!repo.update(id,s))return err(404,"Student not found.");return json(200,encode(*repo.get(id)));}catch(std::invalid_argument const&e){return err(400,e.what());}catch(...){return err(500,"Database operation failed.");}});
-CROW_ROUTE(app,"/api/students/<int>").methods(crow::HTTPMethod::DELETE)([&](int id){try{if(!repo.remove(id))return err(404,"Student not found.");crow::json::wvalue v;v["message"]="Deleted";return json(200,std::move(v));}catch(...){return err(500,"Database operation failed.");}});
-CROW_ROUTE(app,"/api/<path>").methods(crow::HTTPMethod::OPTIONS)([](crow::request const&,std::string const&){crow::response r(204);cors(r);return r;});
-int port=8080;if(const char*p=std::getenv("PORT"))port=std::stoi(p);std::cout<<"API listening on port "<<port<<'\\n';app.port(static_cast<std::uint16_t>(port)).multithreaded().run();}
+#include <string>
+#include <utility>
+
+namespace {
+std::string environment(const char* name, const std::string& fallback) {
+    const char* value = std::getenv(name);
+    return value == nullptr || std::string(value).empty() ? fallback : value;
+}
+
+void add_cors(crow::response& response) {
+    response.set_header("Access-Control-Allow-Origin", environment("CORS_ORIGIN", "http://localhost:5173"));
+    response.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    response.set_header("Access-Control-Allow-Headers", "Content-Type");
+    response.set_header("Vary", "Origin");
+}
+
+crow::response json_response(int status, crow::json::wvalue body) {
+    crow::response response(status, body.dump());
+    response.set_header("Content-Type", "application/json; charset=utf-8");
+    add_cors(response);
+    return response;
+}
+
+crow::response error_response(int status, const std::string& message) {
+    crow::json::wvalue body;
+    body["error"] = message;
+    return json_response(status, std::move(body));
+}
+
+crow::json::wvalue encode_student(const Student& student) {
+    crow::json::wvalue body;
+    body["id"] = student.id;
+    body["name"] = student.name;
+    body["age"] = student.age;
+    body["major"] = student.major;
+    body["gpa"] = student.gpa;
+    return body;
+}
+
+Student decode_student(const crow::json::rvalue& body) {
+    if (!body || !body.has("name") || !body.has("age") ||
+        !body.has("major") || !body.has("gpa")) {
+        throw std::invalid_argument("Required fields: name, age, major and gpa.");
+    }
+
+    Student student;
+    student.name = body["name"].s();
+    student.age = body["age"].i();
+    student.major = body["major"].s();
+    student.gpa = body["gpa"].d();
+    return normalize_student(std::move(student));
+}
+
+crow::response database_error(const std::exception& error) {
+    std::cerr << "[student-api] " << error.what() << '\n';
+    return error_response(500, "The server could not complete the request. Check the API logs.");
+}
+} // namespace
+
+int main() {
+    crow::SimpleApp app;
+    StudentRepository repository;
+
+    CROW_ROUTE(app, "/api/health")
+    ([&repository]() {
+        try {
+            repository.health();
+            crow::json::wvalue body;
+            body["status"] = "ok";
+            body["database"] = "connected";
+            return json_response(200, std::move(body));
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/students").methods(crow::HTTPMethod::GET)
+    ([&repository]() {
+        try {
+            const auto students = repository.list();
+            crow::json::wvalue::list data;
+            data.reserve(students.size());
+            for (const auto& student : students) data.emplace_back(encode_student(student));
+            crow::json::wvalue body;
+            body["data"] = std::move(data);
+            body["count"] = static_cast<int>(students.size());
+            return json_response(200, std::move(body));
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/students").methods(crow::HTTPMethod::POST)
+    ([&repository](const crow::request& request) {
+        try {
+            const auto body = crow::json::load(request.body);
+            if (!body) return error_response(400, "Request body must contain valid JSON.");
+            Student student = decode_student(body);
+            if (const auto problem = validate_student(student)) return error_response(422, *problem);
+            return json_response(201, encode_student(repository.create(student)));
+        } catch (const std::invalid_argument& error) {
+            return error_response(400, error.what());
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/students/<int>").methods(crow::HTTPMethod::GET)
+    ([&repository](int id) {
+        try {
+            const auto student = repository.get(id);
+            if (!student) return error_response(404, "Student not found.");
+            return json_response(200, encode_student(*student));
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/students/<int>").methods(crow::HTTPMethod::PUT)
+    ([&repository](const crow::request& request, int id) {
+        try {
+            const auto body = crow::json::load(request.body);
+            if (!body) return error_response(400, "Request body must contain valid JSON.");
+            Student student = decode_student(body);
+            if (const auto problem = validate_student(student)) return error_response(422, *problem);
+            if (!repository.update(id, student)) return error_response(404, "Student not found.");
+            const auto updated = repository.get(id);
+            if (!updated) return error_response(404, "Student not found.");
+            return json_response(200, encode_student(*updated));
+        } catch (const std::invalid_argument& error) {
+            return error_response(400, error.what());
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/students/<int>").methods(crow::HTTPMethod::DELETE)
+    ([&repository](int id) {
+        try {
+            if (!repository.remove(id)) return error_response(404, "Student not found.");
+            crow::json::wvalue body;
+            body["message"] = "Student deleted.";
+            return json_response(200, std::move(body));
+        } catch (const std::exception& error) {
+            return database_error(error);
+        }
+    });
+
+    CROW_ROUTE(app, "/api/<path>").methods(crow::HTTPMethod::OPTIONS)
+    ([](const crow::request&, const std::string&) {
+        crow::response response(204);
+        add_cors(response);
+        return response;
+    });
+
+    const int port = std::stoi(environment("PORT", "8080"));
+    std::cout << "Student Management API listening on http://localhost:" << port << '\n';
+    app.port(static_cast<std::uint16_t>(port)).multithreaded().run();
+    return 0;
+}
