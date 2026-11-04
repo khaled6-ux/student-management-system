@@ -1,0 +1,95 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "backend/**"
+      - "database/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "database/**"
+      - "CMakeLists.txt"
+      - "vcpkg.json"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: student_manager
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d student_manager"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/student_manager
+      PORT: 8080
+      CORS_ORIGIN: http://localhost:5173
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl zip unzip tar pkg-config postgresql-client
+
+      - name: Bootstrap vcpkg
+        run: |
+          git clone --depth 1 https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVCPKG_TARGET_TRIPLET=x64-linux
+
+      - name: Build C++ API and tests
+        run: cmake --build build --parallel 2
+
+      - name: Run C++ unit tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Initialize PostgreSQL schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/init.sql
+
+      - name: Start API and wait for readiness
+        run: |
+          ./build/student-api > "$RUNNER_TEMP/student-api.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/student-api.pid"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/api/health; then
+              echo
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/student-api.log"
+          exit 1
+
+      - name: Run API and PostgreSQL integration tests
+        run: python3 backend/tests/api_integration.py
+
+      - name: Show API logs on failure
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/student-api.log" ]; then
+            cat "$RUNNER_TEMP/student-api.log"
+          fi
