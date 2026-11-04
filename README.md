@@ -34,7 +34,7 @@ The schema is initialized from `database/init.sql`.
 
 Install CMake, a C++20 compiler, and vcpkg. The vcpkg manifest installs Crow and libpqxx.
 
-Configure the project with the vcpkg toolchain file, then build:
+Configure and build:
 
 ```bash
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
@@ -79,13 +79,14 @@ Open http://localhost:5173.
 
 ## Tests and CI
 
-- C++ validation tests run through CTest.
-- GitHub Actions checks the frontend TypeScript build on relevant pushes and pull requests.
+- C++ service validation tests run through CTest.
+- API integration tests exercise CRUD and validation against PostgreSQL.
+- GitHub Actions runs the C++ build, unit tests, PostgreSQL-backed API integration tests, and frontend TypeScript build.
+
+See [backend integration testing](docs/backend-integration.md), [the repository audit](docs/phase-1-audit.md), [architecture notes](docs/architecture.md), and [frontend setup](frontend/README.md).
 
 ## Important deployment and data notes
 
 This is a development-stage application, not a production-ready student information system. Authentication, role-based authorization, audit logging, production secret management, TLS, rate limiting, and operational backup/restore still need implementation before public deployment or use with real student records.
 
 The original console application accepts a grade from 0 to 100, while its sample records contain values such as 3.1 and 3.0. The rebuilt database currently treats this field as a 0.00–4.00 GPA. Confirm the intended grading scale and validate any legacy data before migration.
-
-See [the repository audit](docs/phase-1-audit.md), [architecture notes](docs/architecture.md), and [frontend setup](frontend/README.md).
