@@ -18,11 +18,11 @@ std::string connection_string() {
 template <typename Row>
 Student read_student(const Row& row) {
     return {
-        row["id"].as<int>(),
-        row["name"].as<std::string>(),
-        row["age"].as<int>(),
-        row["major"].as<std::string>(),
-        row["gpa"].as<double>()
+        row["id"].template as<int>(),
+        row["name"].template as<std::string>(),
+        row["age"].template as<int>(),
+        row["major"].template as<std::string>(),
+        row["gpa"].template as<double>()
     };
 }
 } // namespace
