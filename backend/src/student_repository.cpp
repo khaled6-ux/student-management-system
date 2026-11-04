@@ -15,7 +15,8 @@ std::string connection_string() {
     return value;
 }
 
-Student read_student(const pqxx::row& row) {
+template <typename Row>
+Student read_student(const Row& row) {
     return {
         row["id"].as<int>(),
         row["name"].as<std::string>(),
