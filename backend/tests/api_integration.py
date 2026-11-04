@@ -37,7 +37,7 @@ def request(method, path, payload=None, expected_status=200):
 def main():
     health = request("GET", "/api/health")
     assert health.get("status") == "ok", health
-    assert health.get("database") == "connected", health
+    assert health.get("database") == "sqlite", health
 
     before = request("GET", "/api/students")
     assert isinstance(before.get("data"), list), before
