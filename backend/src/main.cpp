@@ -3,6 +3,12 @@
 
 #include <crow.h>
 
+// Windows headers define DELETE as a macro for access rights.
+// That macro conflicts with Crow's crow::HTTPMethod::DELETE enum constant.
+#ifdef DELETE
+#undef DELETE
+#endif
+
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
